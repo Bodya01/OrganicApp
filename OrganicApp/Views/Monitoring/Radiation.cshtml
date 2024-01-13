@@ -1,0 +1,220 @@
+﻿@model OrganicApp.Models.ViewModels.RadiationViewModel
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="container mt-4">
+
+    <!-- City Dropdown -->
+    <div class="mb-3">
+        <label for="cityDropdown" class="form-label">Select City:</label>
+        <select class="form-select" id="cityDropdown" onchange="onCitySelectionChange()">
+            <option value="" disabled selected>Select a city</option>
+            @foreach (var city in Model.Cities)
+            {
+                <option value="@city.Id">@city.Name</option>
+            }
+        </select>
+    </div>
+
+    <!-- Date Picker -->
+    <div class="mb-3">
+        <label for="datepicker" class="form-label">Select Date:</label>
+        <input type="date" class="form-control" id="datepicker" onchange="onDateSelectionChange()">
+    </div>
+
+    <!-- Selected City Information -->
+    <div id="selectedCityInfo" class="mb-4">
+        <h4>Selected City Information:</h4>
+        <p><strong>Name:</strong> <span id="selectedCityName"></span></p>
+        <!-- Add other properties of City as needed -->
+    </div>
+
+    <!-- Monitoring Data Table -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Date</th>
+                    <th>Radiation Level</th>
+                    <th>Status</th> <!-- New column for status -->
+                    <!-- Add other columns as needed -->
+                </tr>
+            </thead>
+            <tbody id="monitoringDataBody">
+                <!-- Monitoring records will be displayed here -->
+                @foreach (var data in Model.MonitoringData)
+                {
+                    <tr>
+                        <td>@data.Date.ToShortDateString()</td>
+                        <td>@data.RadiationLevel</td>
+                        <td>@data.Status</td> <!-- Dynamic color based on status -->
+                        <!-- Add other cells as needed -->
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<div>
+    <canvas id="myChart" width="400" height="200"></canvas>
+</div>
+
+<!-- JavaScript to handle UI interaction -->
+<script>
+    function onCitySelectionChange() {
+        var selectedCityId = document.getElementById("cityDropdown").value;
+        // You can perform additional actions when the city selection changes
+        updateSelectedCityInfo(selectedCityId);
+        fetchMonitoringData(selectedCityId, getDate());
+    }
+
+    function onDateSelectionChange() {
+        var selectedCityId = document.getElementById("cityDropdown").value;
+        // You can perform additional actions when the date selection changes
+        updateSelectedCityInfo(selectedCityId);
+        fetchMonitoringData(selectedCityId, getDate());
+    }
+
+    function getDate() {
+        var dateInput = document.getElementById("datepicker").value;
+        if (!dateInput) {
+            return null;
+        }
+
+        // Convert date to ISO format
+        var isoDate = new Date(dateInput).toISOString();
+
+        // Remove the time part and keep only the date part
+        return isoDate.split('T')[0];
+    }
+
+    function updateSelectedCityInfo(cityId) {
+        var selectedCity = findCityById(cityId);
+        document.getElementById("selectedCityName").innerText = selectedCity ? selectedCity.Name : "";
+    }
+
+    function findCityById(cityId) {
+        return @Html.Raw(Json.Serialize(Model.Cities)) // Convert the C# Model.Cities to JavaScript array
+                    .find(city => city.Id === cityId);
+    }
+
+    async function fetchMonitoringData(cityId, date) {
+        if (!date) {
+            // Handle invalid or empty date
+            console.error("Invalid or empty date.");
+            return;
+        }
+
+        // Fetch monitoring data from the server
+        const response = await fetch(`/Monitoring/GetMonitoringData?cityId=${cityId}&date=${date}`);
+
+        if (!response.ok) {
+            // Handle server response error
+            console.error(`Error fetching monitoring data. Status: ${response.status}`);
+            return;
+        }
+
+        try {
+            const monitoringData = await response.json();
+            // Update the monitoring data table
+            updateMonitoringDataTable(monitoringData);
+            updateLineChart(monitoringData);
+        } catch (error) {
+            // Handle JSON parsing error
+            console.error("Error parsing JSON:", error);
+        }
+    }
+
+    function updateMonitoringDataTable(monitoringData) {
+        var tbody = document.getElementById("monitoringDataBody");
+
+        // Clear existing rows
+        tbody.innerHTML = "";
+
+        if (monitoringData.length === 0) {
+            // Display a message when there is no data
+            var noDataRow = tbody.insertRow();
+            var noDataCell = noDataRow.insertCell(0);
+            noDataCell.colSpan = 3; // Span across all columns
+            noDataCell.innerText = "No monitoring data available for the selected city and date.";
+        } else {
+            // Add new rows based on monitoringData
+            monitoringData.forEach(data => {
+                var row = tbody.insertRow();
+                var cellDate = row.insertCell(0);
+                var cellRadiationLevel = row.insertCell(1);
+                var cellStatus = row.insertCell(2); // New cell for status
+
+                // Format date without time and milliseconds
+                var formattedDate = new Date(data.date).toLocaleDateString();
+                cellDate.innerText = formattedDate;
+
+                cellRadiationLevel.innerText = data.radiationLevel;
+
+                // Set color dynamically based on status
+                cellStatus.style.color = getStatusColor(data.status);
+                cellStatus.innerText = data.status;
+
+                // Add other cells as needed
+            });
+        }
+    }
+
+    function getStatusColor(status) {
+        switch (status.toLowerCase()) {
+            case "good":
+                return "green";
+            case "moderate":
+                return "yellow";
+            case "bad":
+                return "orange";
+            case "danger":
+                return "red";
+            default:
+                return "black"; // Default color
+        }
+    }
+
+    // Function to update the line chart
+    function updateLineChart(data) {
+        var ctx = document.getElementById('myChart').getContext('2d');
+
+        var chartData = {
+            labels: data.map(entry => entry.date),
+            datasets: [{
+                label: 'Radiation Level',
+                data: data.map(entry => entry.radiationLevel),
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 2,
+                fill: false
+            }]
+        };
+
+        var chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: [{
+                    type: 'time',
+                    time: {
+                        unit: 'day',
+                        tooltipFormat: 'MMM D'
+                    }
+                }],
+                y: [{
+                    ticks: {
+                        beginAtZero: true
+                    }
+                }]
+            }
+        };
+
+        var myChart = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: chartOptions
+        });
+    }
+</script>
