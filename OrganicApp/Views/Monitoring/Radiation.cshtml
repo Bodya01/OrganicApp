@@ -5,21 +5,24 @@
 <div class="container mt-4">
 
     <!-- City Dropdown -->
-    <div class="mb-3">
-        <label for="cityDropdown" class="form-label">Select City:</label>
-        <select class="form-select" id="cityDropdown" onchange="onCitySelectionChange()">
-            <option value="" disabled selected>Select a city</option>
-            @foreach (var city in Model.Cities)
-            {
-                <option value="@city.Id">@city.Name</option>
-            }
-        </select>
-    </div>
+    <div class="row">
+        <!-- City Dropdown -->
+        <div class="col-md-6 mb-3">
+            <label for="cityDropdown" class="form-label">Select City:</label>
+            <select class="form-select" id="cityDropdown" onchange="onCitySelectionChange()">
+                <option value="" disabled selected>Select a city</option>
+                @foreach (var city in Model.Cities)
+                {
+                    <option value="@city.Id">@city.Name</option>
+                }
+            </select>
+        </div>
 
-    <!-- Date Picker -->
-    <div class="mb-3">
-        <label for="datepicker" class="form-label">Select Date:</label>
-        <input type="date" class="form-control" id="datepicker" onchange="onDateSelectionChange()">
+        <!-- Date Picker -->
+        <div class="col-md-6 mb-3">
+            <label for="datepicker" class="form-label">Select Date:</label>
+            <input type="date" class="form-control" id="datepicker" onchange="onDateSelectionChange()">
+        </div>
     </div>
 
     <!-- Selected City Information -->
@@ -42,23 +45,15 @@
             </thead>
             <tbody id="monitoringDataBody">
                 <!-- Monitoring records will be displayed here -->
-                @foreach (var data in Model.MonitoringData)
-                {
-                    <tr>
-                        <td>@data.Date.ToShortDateString()</td>
-                        <td>@data.RadiationLevel</td>
-                        <td>@data.Status</td> <!-- Dynamic color based on status -->
-                        <!-- Add other cells as needed -->
-                    </tr>
-                }
             </tbody>
         </table>
     </div>
 
-</div>
+    <!-- Line Chart -->
+    <div>
+        <canvas id="myChart" width="400" height="200" style="display: none;"></canvas>
+    </div>
 
-<div>
-    <canvas id="myChart" width="400" height="200"></canvas>
 </div>
 
 <!-- JavaScript to handle UI interaction -->
@@ -97,7 +92,7 @@
 
     function findCityById(cityId) {
         return @Html.Raw(Json.Serialize(Model.Cities)) // Convert the C# Model.Cities to JavaScript array
-                    .find(city => city.Id === cityId);
+                        .find(city => city.Id === cityId);
     }
 
     async function fetchMonitoringData(cityId, date) {
@@ -118,7 +113,7 @@
 
         try {
             const monitoringData = await response.json();
-            // Update the monitoring data table
+            // Update the monitoring data table and line chart
             updateMonitoringDataTable(monitoringData);
             updateLineChart(monitoringData);
         } catch (error) {
@@ -139,6 +134,9 @@
             var noDataCell = noDataRow.insertCell(0);
             noDataCell.colSpan = 3; // Span across all columns
             noDataCell.innerText = "No monitoring data available for the selected city and date.";
+
+            // Hide the chart when there is no data
+            document.getElementById("myChart").style.display = "none";
         } else {
             // Add new rows based on monitoringData
             monitoringData.forEach(data => {
@@ -159,6 +157,9 @@
 
                 // Add other cells as needed
             });
+
+            // Show the chart when there is data
+            document.getElementById("myChart").style.display = "block";
         }
     }
 
@@ -177,44 +178,52 @@
         }
     }
 
-    // Function to update the line chart
+    var myChart = null; // Declare myChart globally
+
     function updateLineChart(data) {
         var ctx = document.getElementById('myChart').getContext('2d');
 
-        var chartData = {
-            labels: data.map(entry => entry.date),
-            datasets: [{
-                label: 'Radiation Level',
-                data: data.map(entry => entry.radiationLevel),
-                borderColor: 'rgba(75, 192, 192, 1)',
-                borderWidth: 2,
-                fill: false
-            }]
-        };
-
-        var chartOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: [{
-                    type: 'time',
-                    time: {
-                        unit: 'day',
-                        tooltipFormat: 'MMM D'
+        if (!myChart) {
+            // Create a new Chart instance if it doesn't exist
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Radiation Level',
+                        data: [],
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: [{
+                            type: 'time',
+                            time: {
+                                unit: 'day',
+                                tooltipFormat: 'MMM D'
+                            }
+                        }],
+                        y: [{
+                            ticks: {
+                                beginAtZero: true
+                            }
+                        }]
                     }
-                }],
-                y: [{
-                    ticks: {
-                        beginAtZero: true
-                    }
-                }]
-            }
-        };
+                }
+            });
+        }
 
-        var myChart = new Chart(ctx, {
-            type: 'line',
-            data: chartData,
-            options: chartOptions
-        });
+        // Update the chart data and options
+        myChart.data.labels = data.map(entry => entry.date);
+        myChart.data.datasets[0].data = data.map(entry => entry.radiationLevel);
+        myChart.canvas.style.width = '100%';
+        myChart.canvas.style.height = '200px';
+        // Update the chart
+        myChart.update();
     }
 </script>

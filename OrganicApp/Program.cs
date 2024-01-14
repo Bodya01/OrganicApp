@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using OrganicApp.Context;
 using OrganicApp.Data;
+using OrganicApp.Services.Implementations;
+using OrganicApp.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +11,10 @@ builder.Services.AddControllersWithViews();
 
 builder.Services.AddDbContext<OrganicContext>(x =>
     x.UseSqlServer(builder.Configuration.GetConnectionString("Db")));
+
+builder.Services.AddHttpClient();
+
+builder.Services.AddScoped<IMonitoringService, MonitoringService>();
 
 var app = builder.Build();
 
