@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Client;
 using OrganicApp.Context;
 using OrganicApp.Controllers.Base;
 using OrganicApp.Parsers;
@@ -13,13 +14,13 @@ namespace OrganicApp.Controllers
         private readonly IMonitoringService _monitoringService;
         private readonly IDataService _dataService;
 
-        public DataController(IHttpClientFactory httpClientFactory, IMonitoringService monitoringService, IDataService dataService, OrganicContext context) : base(context)
+        public DataController(IMonitoringService monitoringService, IDataService dataService, OrganicContext context) : base(context)
         {
             _monitoringService = monitoringService;
             _dataService = dataService;
         }
 
-        [HttpGet("GetRadiationForLastWeek/deviceId?")]
+        [HttpGet("GetRadiationForLastWeek/deviceId:string")]
         public async Task<IActionResult> GetRadiationForLastWeek(string deviceId)
         {
             try
